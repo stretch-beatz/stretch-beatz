@@ -1,6 +1,7 @@
 from music21 import converter, instrument, note, chord
 import json
 import sys
+from FoxDot import *
 
 def extractNote(element):
     return int(element.pitch.ps)
@@ -81,6 +82,7 @@ def notesProcessing(values,notePerCompass, nCompass):
                     start.append(last_end)
                     notes.append((0,))
                     durations.append(note_data[0]-last_end)
+                    #durations.append("rest("+str(note_data[0]-last_end)+")")
                     amps.append(0)
 
                 start.append(note_data[0])
@@ -130,11 +132,16 @@ def intoCompasses(notes,dur,amps,notePerCompass, nCompass):
     print(list(map(sum,dur_comp)))
     return notes_comp,dur_comp,amps_comp
 
+def simplifyNote(n):
+    if len(n)>1:
+        return n
+    elif len(n)==1:
+        return n[0]
 
 def main(midiFile):
 
     mid = converter.parse(midiFile)
-
+    
     instruments = instrument.partitionByInstrument(mid)
 
     data = {}
@@ -153,7 +160,7 @@ def main(midiFile):
     with open('base_file.py','r') as f:
         text = f.read()
 
-    notePerCompass = 8
+    notePerCompass = 16
     nCompass = 30
     i = 0
     u = 0
@@ -169,7 +176,17 @@ def main(midiFile):
                 amps = final_v[3]
                 notes_comp, dur_comp, amps_comp = intoCompasses(notes,dur,amps,notePerCompass,nCompass)
                 for j in range(len(notes_comp)):
-                    final_compas[j].append("\td{} >> pluck({},dur={},amp={})\n".format(u,notes_comp[j],dur_comp[j],amps_comp[j]))
+                    dur_strings = []
+                    for k in range(len(dur_comp[j])):
+                        if amps_comp[j][k] > 0:
+                            dur_strings.append(str(dur_comp[j][k]))
+                        else:
+                            dur_strings.append("rest("+str(dur_comp[j][k])+")")
+
+                    dur_string = " ,".join(dur_strings)
+                    simple_notes = list(map(simplifyNote, notes_comp[j]))
+                    final_compas[j].append("\td{} >> pluck({},dur=[{}])\n".format(u,simple_notes,dur_string))
+                    #final_compas[j].append("\td{} >> pluck({},dur={},amp={})\n".format(u,notes_comp[j],dur_comp[j],amps_comp[j]))
                 u += 1
         i+=1
 
