@@ -1,6 +1,6 @@
 from music21 import converter, instrument, note, chord
 import json
-import sys
+import sys, pickle
 from FoxDot import *
 
 def extractNote(element):
@@ -138,7 +138,36 @@ def simplifyNote(n):
     elif len(n)==1:
         return n[0]
 
+def simplifyNoteF(n):
+    return n[0]
+
+def simplifyNotes(notes):
+    notes =  list(map(simplifyNoteF, notes))
+    pure = list(filter(lambda n : n >- 60, notes))
+    clean = []
+    for i in range(len(notes)):
+        if notes[i] > -60 :
+            clean.append(notes[i])
+        else:
+            if len(clean) > 0:
+                clean.append(clean[-1])
+            elif notes[(i+1)%len(notes)] > -60:
+                clean.append(notes[(i+1)%len(notes)])
+            elif(len(pure) > 0):
+                clean.append(pure[i%len(pure)])
+        
+    
+    #clean.append(notes[(i+1)%len(notes)])
+    
+    #clean = list(filter(lambda n : n >- 60, notes))
+    
+    return clean
+
 def main(midiFile):
+    output_data = {
+        "degree":[],
+        "dur":[]
+    }
 
     mid = converter.parse(midiFile)
     
@@ -176,15 +205,24 @@ def main(midiFile):
                 amps = final_v[3]
                 notes_comp, dur_comp, amps_comp = intoCompasses(notes,dur,amps,notePerCompass,nCompass)
                 for j in range(len(notes_comp)):
+                    dur_export = []
                     dur_strings = []
                     for k in range(len(dur_comp[j])):
                         if amps_comp[j][k] > 0:
                             dur_strings.append(str(dur_comp[j][k]))
+                            dur_export.append(float(dur_comp[j][k]))
                         else:
                             dur_strings.append("rest("+str(dur_comp[j][k])+")")
+                            dur_export.append(-1*float(dur_comp[j][k]))
 
                     dur_string = " ,".join(dur_strings)
                     simple_notes = list(map(simplifyNote, notes_comp[j]))
+
+                    output_data["degree"].append(simplifyNotes(notes_comp[j]))
+                    #output_data["dur"].append(list(map(float,dur_comp[j])))
+                    output_data["dur"].append(dur_export)
+
+
                     final_compas[j].append("\td{} >> pluck({},dur=[{}])\n".format(u,simple_notes,dur_string))
                     #final_compas[j].append("\td{} >> pluck({},dur={},amp={})\n".format(u,notes_comp[j],dur_comp[j],amps_comp[j]))
                 u += 1
@@ -206,8 +244,17 @@ def main(midiFile):
     text += "Clock.schedule(lambda : Clock.clear(), start + {})\n".format(notePerCompass*(i+1))
 
     outputFile = midiFile.split("/")[-1].replace(".mid",".py")
-
     with open(outputFile,'w') as f:
         f.write(text)
+
+    jsonFile = midiFile.split("/")[-1].replace(".mid",".json")
+    with open(jsonFile,'w') as j:
+        json.dump(output_data, j)
+
+    '''
+    pickleFile = midiFile.split("/")[-1].replace(".mid",".pickle")
+    with open(pickleFile,'w') as p:
+        pickle.dump(output_data, p)
+    '''
 
 main(sys.argv[1])
