@@ -64,7 +64,7 @@ def notesProcessing(values,notePerCompass, nCompass):
         notes_per_beat[str(note[0])].append(note)
 
     notes_at_the_same_time = max(map(len,notes_per_beat.values()))
-    print(notes_at_the_same_time)
+    #print(notes_at_the_same_time)
     final_notes = []
     final_durs = []
     final_amps = []
@@ -129,7 +129,7 @@ def intoCompasses(notes,dur,amps,notePerCompass, nCompass):
             i = j
             
         j+=1
-    print(list(map(sum,dur_comp)))
+    #print(list(map(sum,dur_comp)))
     return notes_comp,dur_comp,amps_comp
 
 def simplifyNote(n):
@@ -156,11 +156,6 @@ def simplifyNotes(notes):
             elif(len(pure) > 0):
                 clean.append(pure[i%len(pure)])
         
-    
-    #clean.append(notes[(i+1)%len(notes)])
-    
-    #clean = list(filter(lambda n : n >- 60, notes))
-    
     return clean
 
 def main(midiFile):
@@ -219,7 +214,6 @@ def main(midiFile):
                     simple_notes = list(map(simplifyNote, notes_comp[j]))
 
                     output_data["degree"].append(simplifyNotes(notes_comp[j]))
-                    #output_data["dur"].append(list(map(float,dur_comp[j])))
                     output_data["dur"].append(dur_export)
 
 
@@ -250,11 +244,5 @@ def main(midiFile):
     jsonFile = midiFile.split("/")[-1].replace(".mid",".json")
     with open(jsonFile,'w') as j:
         json.dump(output_data, j)
-
-    '''
-    pickleFile = midiFile.split("/")[-1].replace(".mid",".pickle")
-    with open(pickleFile,'w') as p:
-        pickle.dump(output_data, p)
-    '''
 
 main(sys.argv[1])
