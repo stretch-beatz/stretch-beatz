@@ -245,4 +245,16 @@ def main(midiFile):
     with open(jsonFile,'w') as j:
         json.dump(output_data, j)
 
+import argparse
+
+parser = argparse.ArgumentParser(description='Process files into the data format for learning.')
+parser.add_argument('file', metavar='F', type=string, nargs='+',
+                    help='file to convert')
+'''parser.add_argument('--sum', dest='accumulate', action='store_const',
+                    const=sum, default=max,
+                    help='sum the integers (default: find the max)')
+'''
+
+args = parser.parse_args()
+
 main(sys.argv[1])
