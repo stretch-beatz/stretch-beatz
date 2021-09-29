@@ -1,6 +1,9 @@
-from music21 import converter, instrument, note, chord
+from music21 import converter, instrument, note, chord, corpus
 import json
-import sys, pickle
+import sys
+import os.path as ospath
+#from os.path import splitext, basename
+#from os import *
 from FoxDot import *
 
 def extractNote(element):
@@ -158,14 +161,27 @@ def simplifyNotes(notes):
         
     return clean
 
-def main(midiFile):
+def main(args):
+    filename = ""
+    ext = ""
     output_data = {
         "degree":[],
         "dur":[]
     }
 
-    mid = converter.parse(midiFile)
-    
+    print("args", args)   
+    if (args.midi != None):
+        mid = converter.parse(args.midi)
+        filename, ext = ospath.splitext(ospath.basename(args.midi))
+    elif (args.corpus != None):
+        #http://web.mit.edu/music21/doc/about/referenceCorpus.html
+        mid = corpus.parse(args.corpus)
+        basenamef = ospath.basename(args.corpus)
+        #print("basenamef",basenamef)
+        filename, ext = ospath.splitext(basenamef)
+
+    #print("filename, ext", filename, ext)
+
     instruments = instrument.partitionByInstrument(mid)
 
     data = {}
@@ -216,7 +232,6 @@ def main(midiFile):
                     output_data["degree"].append(simplifyNotes(notes_comp[j]))
                     output_data["dur"].append(dur_export)
 
-
                     final_compas[j].append("\td{} >> pluck({},dur=[{}])\n".format(u,simple_notes,dur_string))
                     #final_compas[j].append("\td{} >> pluck({},dur={},amp={})\n".format(u,notes_comp[j],dur_comp[j],amps_comp[j]))
                 u += 1
@@ -237,24 +252,27 @@ def main(midiFile):
 
     text += "Clock.schedule(lambda : Clock.clear(), start + {})\n".format(notePerCompass*(i+1))
 
-    outputFile = midiFile.split("/")[-1].replace(".mid",".py")
+    outputFile =  ospath.join("output",filename + ".py")
     with open(outputFile,'w') as f:
         f.write(text)
 
-    jsonFile = midiFile.split("/")[-1].replace(".mid",".json")
+    jsonFile = ospath.join("output",filename + ".json")
     with open(jsonFile,'w') as j:
         json.dump(output_data, j)
 
-import argparse
 
-parser = argparse.ArgumentParser(description='Process files into the data format for learning.')
-parser.add_argument('file', metavar='F', type=string, nargs='+',
-                    help='file to convert')
-'''parser.add_argument('--sum', dest='accumulate', action='store_const',
-                    const=sum, default=max,
-                    help='sum the integers (default: find the max)')
-'''
 
-args = parser.parse_args()
+if __name__ == "__main__":
+    import argparse
 
-main(sys.argv[1])
+    parser = argparse.ArgumentParser(description='Process files into the data format for learning.')
+    parser.add_argument('--midi', help='file to convert')#, default="midis/bad_guy.mid")
+    parser.add_argument('--corpus', help='file from corpus http://web.mit.edu/music21/doc/about/referenceCorpus.html', default='bach/bwv108.6.xml')
+    '''parser.add_argument('--sum', dest='accumulate', action='store_const',
+                        const=sum, default=max,
+                        help='sum the integers (default: find the max)')
+    '''
+
+    args = parser.parse_args()
+
+    main(args)
