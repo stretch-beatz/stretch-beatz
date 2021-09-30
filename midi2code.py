@@ -164,6 +164,7 @@ def simplifyNotes(notes):
 def main(args):
     filename = ""
     ext = ""
+
     output_data = {
         "degree":[],
         "dur":[]
@@ -173,16 +174,49 @@ def main(args):
     if (args.midi != None):
         mid = converter.parse(args.midi)
         filename, ext = ospath.splitext(ospath.basename(args.midi))
+        process_midi(mid, filename)
+    elif (args.composer != None):
+        #http://web.mit.edu/music21/doc/about/referenceCorpus.html
+        composer = corpus.getComposer(args.composer)
+        for filecorp in composer: 
+            mid = corpus.parse(filecorp)
+            basenamef = ospath.basename(filecorp)
+            #print("basenamef",basenamef)
+            filename, ext = ospath.splitext(basenamef)
+            newdata = process_midi(mid, filename)
+            output_data["degree"].extend(newdata, output_data["degree"])
+            output_data["dur"].extend(newdata, output_data["dur"])
+        
+        jsonFile = ospath.join("output",args.composer + ".json")
+        print("Saving "+jsonFile)
+        with open(jsonFile,'w') as j:
+            json.dump(output_data, j)
+    
     elif (args.corpus != None):
         #http://web.mit.edu/music21/doc/about/referenceCorpus.html
         mid = corpus.parse(args.corpus)
         basenamef = ospath.basename(args.corpus)
         #print("basenamef",basenamef)
         filename, ext = ospath.splitext(basenamef)
+        process_midi(mid, filename)
+
+
+
 
     #print("filename, ext", filename, ext)
+    process_midi(mid, filename)
+
+
+def process_midi(mid, filename):
+    output_data = {
+        "degree":[],
+        "dur":[]
+    }
 
     instruments = instrument.partitionByInstrument(mid)
+    if(instruments == None or len(instruments) == 0):
+        instruments = {}
+        instruments.parts = [mid]
 
     data = {}
     i = 0
@@ -253,13 +287,16 @@ def main(args):
     text += "Clock.schedule(lambda : Clock.clear(), start + {})\n".format(notePerCompass*(i+1))
 
     outputFile =  ospath.join("output",filename + ".py")
+    print("Saving "+outputFile)
     with open(outputFile,'w') as f:
         f.write(text)
 
     jsonFile = ospath.join("output",filename + ".json")
+    print("Saving "+jsonFile)
     with open(jsonFile,'w') as j:
         json.dump(output_data, j)
 
+    return output_data
 
 
 if __name__ == "__main__":
@@ -268,6 +305,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Process files into the data format for learning.')
     parser.add_argument('--midi', help='file to convert')#, default="midis/bad_guy.mid")
     parser.add_argument('--corpus', help='file from corpus http://web.mit.edu/music21/doc/about/referenceCorpus.html', default='bach/bwv108.6.xml')
+    parser.add_argument('--composer', help='Music21 Compsoer info to learn from')#, default="midis/bad_guy.mid")
     '''parser.add_argument('--sum', dest='accumulate', action='store_const',
                         const=sum, default=max,
                         help='sum the integers (default: find the max)')
