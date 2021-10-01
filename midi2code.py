@@ -1,5 +1,5 @@
 from music21 import converter, instrument, note, chord, corpus
-import json
+import json, pickle
 import sys
 import os.path as ospath
 #from os.path import splitext, basename
@@ -172,7 +172,8 @@ def main(args):
 
     output_data = {
         "degree":[],
-        "dur":[]
+        "dur":[],
+        "dur_json":[]
     }
 
     #print("args", args)   
@@ -202,24 +203,35 @@ def main(args):
             
             newdata = {
                 "degree":[],
-                "dur":[]
+                "dur":[],
+                "dur_json":[]
             }
             
-            jsonFile = ospath.join("output",filename + ".json")
-            if(ospath.isfile(jsonFile)):
-                print("loading "+jsonFile)
-                with open(jsonFile,'r') as j:
-                    newdata = json.load(j)
+            pickleFile = ospath.join("output",filename + ".pickle")
+            if(ospath.isfile(pickleFile)):
+                print("loading "+pickleFile)
+                with open(pickleFile,'rb') as j:
+                    newdata = pickle.load(j)
             else:
                 newdata = process_midi(mid, filename, args.chords)
             
             output_data["degree"] += newdata["degree"]
             output_data["dur"] += newdata["dur"]
+            output_data["dur_json"] += newdata["dur_json"]
         
         jsonFile = ospath.join("output",args.composer + ".json")
+        out_json =  {
+            "degree":output_data["degree"],
+            "dur":output_data["dur_json"]
+        }
         print("Saving "+jsonFile)
         with open(jsonFile,'w') as j:
-            json.dump(output_data, j)
+            json.dump(out_json, j)
+
+        pickleFile = ospath.join("output",args.composer + ".pickle")
+        print("Saving "+pickleFile)
+        with open(pickleFile,'wb') as k:
+            pickle.dump(output_data, k)
     
     elif (args.corpus != None):
         #http://web.mit.edu/music21/doc/about/referenceCorpus.html
@@ -238,7 +250,8 @@ def main(args):
 def process_midi(mid, filename, chords=False):
     output_data = {
         "degree":[],
-        "dur":[]
+        "dur":[],
+        "dur_json":[]
     }
 
     data = {}
@@ -279,6 +292,7 @@ def process_midi(mid, filename, chords=False):
                 notes_comp, dur_comp, amps_comp = intoCompasses(notes,dur,amps,notePerCompass,nCompass)
                 for j in range(len(notes_comp)):
                     dur_export = []
+                    dur_json = []
                     dur_strings = []
                     for k in range(len(dur_comp[j])):
                         if amps_comp[j][k] > 0:
@@ -286,13 +300,17 @@ def process_midi(mid, filename, chords=False):
                             dur_export.append(float(dur_comp[j][k]))
                         else:
                             dur_strings.append("rest("+str(dur_comp[j][k])+")")
-                            dur_export.append(-1*float(dur_comp[j][k]))
+                            dur_json.append(-1*float(dur_comp[j][k]))
+                            dur_export.append(rest(float(dur_comp[j][k])))
+                            
 
                     dur_string = " ,".join(dur_strings)
                     simple_notes = list(map(simplifyNote, notes_comp[j]))
 
                     output_data["degree"].append(simplifyNotes(notes_comp[j],chords))
                     output_data["dur"].append(dur_export)
+                    output_data["dur_json"].append(dur_json)
+
 
                     final_compas[j].append("\td{} >> pluck({},dur=[{}])\n".format(u,simple_notes,dur_string))
                     #final_compas[j].append("\td{} >> pluck({},dur={},amp={})\n".format(u,notes_comp[j],dur_comp[j],amps_comp[j]))
@@ -321,9 +339,19 @@ def process_midi(mid, filename, chords=False):
             f.write(text)
 
         jsonFile = ospath.join("output",filename + ".json")
+        out_json =  {
+            "degree":output_data["degree"],
+            "dur":output_data["dur_json"]
+        }
         print("Saving "+jsonFile)
         with open(jsonFile,'w') as j:
-            json.dump(output_data, j)
+            json.dump(out_json, j)
+
+        
+        pickleFile = ospath.join("output",filename + ".pickle")
+        print("Saving "+pickleFile)
+        with open(pickleFile,'wb') as k:
+            pickle.dump(output_data, k)
     else:
         print("No Data to save for " + filename)
 
