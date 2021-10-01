@@ -172,14 +172,23 @@ def main(args):
 
     print("args", args)   
     if (args.midi != None):
-        mid = converter.parse(args.midi)
-        filename, ext = ospath.splitext(ospath.basename(args.midi))
-        process_midi(mid, filename)
+        try:
+            mid = converter.parse(args.midi)
+            filename, ext = ospath.splitext(ospath.basename(args.midi))
+            process_midi(mid, filename)
+        except:
+            print("Can't parse "+str(args.midi))
+        
     elif (args.composer != None):
         #http://web.mit.edu/music21/doc/about/referenceCorpus.html
         composer = corpus.getComposer(args.composer)
         for filecorp in composer: 
-            mid = corpus.parse(filecorp)
+            try:
+                mid = corpus.parse(filecorp)
+            except:
+                print("Can't parse "+str(filecorp))
+                continue    
+            
             basenamef = ospath.basename(filecorp)
             #print("basenamef",basenamef)
             filename, ext = ospath.splitext(basenamef)
@@ -194,7 +203,6 @@ def main(args):
                 print("loading "+jsonFile)
                 with open(jsonFile,'r') as j:
                     newdata = json.load(j)
-                    print(newdata)
             else:
                 newdata = process_midi(mid, filename)
             
@@ -208,12 +216,15 @@ def main(args):
     
     elif (args.corpus != None):
         #http://web.mit.edu/music21/doc/about/referenceCorpus.html
-        mid = corpus.parse(args.corpus)
-        basenamef = ospath.basename(args.corpus)
-        #print("basenamef",basenamef)
-        filename, ext = ospath.splitext(basenamef)
-        process_midi(mid, filename)
-
+        try:
+            mid = corpus.parse(args.corpus)
+            basenamef = ospath.basename(args.corpus)
+            #print("basenamef",basenamef)
+            filename, ext = ospath.splitext(basenamef)
+            process_midi(mid, filename)
+        except:
+            print("Can't parse "+str(args.midi))
+        
 
 def process_midi(mid, filename):
     output_data = {
