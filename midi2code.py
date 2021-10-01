@@ -144,21 +144,26 @@ def simplifyNote(n):
 def simplifyNoteF(n):
     return n[0]
 
-def simplifyNotes(notes):
-    notes =  list(map(simplifyNoteF, notes))
-    pure = list(filter(lambda n : n >- 60, notes))
+def simplifyNotes(notes, chords=False):
+    if chords:
+        notes =  list(map(simplifyNote, notes))
+    else:
+        notes =  list(map(simplifyNoteF, notes))
+
+    pure = list(filter(lambda n : (isinstance(n, int) and n >- 60), notes))
+
     clean = []
     for i in range(len(notes)):
-        if notes[i] > -60 :
+        if isinstance(notes[i], int)==False or notes[i] > -60 :
             clean.append(notes[i])
         else:
             if len(clean) > 0:
                 clean.append(clean[-1])
-            elif notes[(i+1)%len(notes)] > -60:
+            elif isinstance(notes[(i+1)%len(notes)], int) == False or notes[(i+1)%len(notes)] > -60:
                 clean.append(notes[(i+1)%len(notes)])
             elif(len(pure) > 0):
                 clean.append(pure[i%len(pure)])
-        
+ 
     return clean
 
 def main(args):
@@ -170,14 +175,15 @@ def main(args):
         "dur":[]
     }
 
-    print("args", args)   
+    #print("args", args)   
     if (args.midi != None):
         try:
             mid = converter.parse(args.midi)
             filename, ext = ospath.splitext(ospath.basename(args.midi))
-            process_midi(mid, filename)
-        except:
+            process_midi(mid, filename, args.chords)
+        except Exception as e:
             print("Can't parse "+str(args.midi))
+            print(e)
         
     elif (args.composer != None):
         #http://web.mit.edu/music21/doc/about/referenceCorpus.html
@@ -185,8 +191,9 @@ def main(args):
         for filecorp in composer: 
             try:
                 mid = corpus.parse(filecorp)
-            except:
+            except Exception as e:
                 print("Can't parse "+str(filecorp))
+                print(e)
                 continue    
             
             basenamef = ospath.basename(filecorp)
@@ -204,7 +211,7 @@ def main(args):
                 with open(jsonFile,'r') as j:
                     newdata = json.load(j)
             else:
-                newdata = process_midi(mid, filename)
+                newdata = process_midi(mid, filename, args.chords)
             
             output_data["degree"] += newdata["degree"]
             output_data["dur"] += newdata["dur"]
@@ -221,12 +228,14 @@ def main(args):
             basenamef = ospath.basename(args.corpus)
             #print("basenamef",basenamef)
             filename, ext = ospath.splitext(basenamef)
-            process_midi(mid, filename)
-        except:
-            print("Can't parse "+str(args.midi))
+            process_midi(mid, filename, args.chords)
+        except Exception as e:
+            print("Can't parse "+str(args.corpus))
+            print(e)
+        
         
 
-def process_midi(mid, filename):
+def process_midi(mid, filename, chords=False):
     output_data = {
         "degree":[],
         "dur":[]
@@ -282,7 +291,7 @@ def process_midi(mid, filename):
                     dur_string = " ,".join(dur_strings)
                     simple_notes = list(map(simplifyNote, notes_comp[j]))
 
-                    output_data["degree"].append(simplifyNotes(notes_comp[j]))
+                    output_data["degree"].append(simplifyNotes(notes_comp[j],chords))
                     output_data["dur"].append(dur_export)
 
                     final_compas[j].append("\td{} >> pluck({},dur=[{}])\n".format(u,simple_notes,dur_string))
@@ -325,13 +334,11 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description='Process files into the data format for learning.')
-    parser.add_argument('--midi', help='file to convert')#, default="midis/bad_guy.mid")
-    parser.add_argument('--corpus', help='file from corpus http://web.mit.edu/music21/doc/about/referenceCorpus.html', default='bach/bwv108.6.xml')
-    parser.add_argument('--composer', help='Music21 Compsoer info to learn from')#, default="midis/bad_guy.mid")
-    '''parser.add_argument('--sum', dest='accumulate', action='store_const',
-                        const=sum, default=max,
-                        help='sum the integers (default: find the max)')
-    '''
+    parser.add_argument('--midi', help='file to convert')
+    parser.add_argument('--corpus', help='file from corpus \nhttp://web.mit.edu/music21/doc/about/referenceCorpus.html', default='bach/bwv108.6.xml')
+    parser.add_argument('--composer', help='Music21 Composer info to learn from')
+    parser.add_argument('--chords', action='store_true', help='keep chords')
+
 
     args = parser.parse_args()
 
