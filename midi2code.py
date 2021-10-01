@@ -297,6 +297,7 @@ def process_midi(mid, filename, chords=False):
                     for k in range(len(dur_comp[j])):
                         if amps_comp[j][k] > 0:
                             dur_strings.append(str(dur_comp[j][k]))
+                            dur_json.append(float(dur_comp[j][k]))
                             dur_export.append(float(dur_comp[j][k]))
                         else:
                             dur_strings.append("rest("+str(dur_comp[j][k])+")")
