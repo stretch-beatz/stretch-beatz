@@ -183,9 +183,23 @@ def main(args):
             basenamef = ospath.basename(filecorp)
             #print("basenamef",basenamef)
             filename, ext = ospath.splitext(basenamef)
-            newdata = process_midi(mid, filename)
-            output_data["degree"].extend(newdata, output_data["degree"])
-            output_data["dur"].extend(newdata, output_data["dur"])
+            
+            newdata = {
+                "degree":[],
+                "dur":[]
+            }
+            
+            jsonFile = ospath.join("output",filename + ".json")
+            if(ospath.isfile(jsonFile)):
+                print("loading "+jsonFile)
+                with open(jsonFile,'r') as j:
+                    newdata = json.load(j)
+                    print(newdata)
+            else:
+                newdata = process_midi(mid, filename)
+            
+            output_data["degree"] += newdata["degree"]
+            output_data["dur"] += newdata["dur"]
         
         jsonFile = ospath.join("output",args.composer + ".json")
         print("Saving "+jsonFile)
@@ -201,34 +215,28 @@ def main(args):
         process_midi(mid, filename)
 
 
-
-
-    #print("filename, ext", filename, ext)
-    process_midi(mid, filename)
-
-
 def process_midi(mid, filename):
     output_data = {
         "degree":[],
         "dur":[]
     }
 
-    instruments = instrument.partitionByInstrument(mid)
-    if(instruments == None or len(instruments) == 0):
-        instruments = {}
-        instruments.parts = [mid]
-
     data = {}
     i = 0
 
-    for instrument_i in instruments.parts:
-        notes_to_parse = instrument_i.recurse()
+    instruments = instrument.partitionByInstrument(mid)
+    if(instruments == None or len(instruments) == 0):
+        data["instrument_0"] = get_notes(mid)
+        
+    else:
+        for instrument_i in instruments.parts:
+            notes_to_parse = instrument_i.recurse()
 
-        if instrument_i.partName is None:
-            data["instrument_{}".format(i)] = get_notes(notes_to_parse)
-            i+=1
-        else:
-            data[instrument_i.partName] = get_notes(notes_to_parse)
+            if instrument_i.partName is None:
+                data["instrument_{}".format(i)] = get_notes(notes_to_parse)
+                i+=1
+            else:
+                data[instrument_i.partName] = get_notes(notes_to_parse)
 
 
     with open('base_file.py','r') as f:
@@ -286,15 +294,18 @@ def process_midi(mid, filename):
 
     text += "Clock.schedule(lambda : Clock.clear(), start + {})\n".format(notePerCompass*(i+1))
 
-    outputFile =  ospath.join("output",filename + ".py")
-    print("Saving "+outputFile)
-    with open(outputFile,'w') as f:
-        f.write(text)
+    if(len(output_data["degree"])):
+        outputFile =  ospath.join("output",filename + ".py")
+        print("Saving "+outputFile)
+        with open(outputFile,'w') as f:
+            f.write(text)
 
-    jsonFile = ospath.join("output",filename + ".json")
-    print("Saving "+jsonFile)
-    with open(jsonFile,'w') as j:
-        json.dump(output_data, j)
+        jsonFile = ospath.join("output",filename + ".json")
+        print("Saving "+jsonFile)
+        with open(jsonFile,'w') as j:
+            json.dump(output_data, j)
+    else:
+        print("No Data to save for " + filename)
 
     return output_data
 
