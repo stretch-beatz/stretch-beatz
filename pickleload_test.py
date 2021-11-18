@@ -1,14 +1,14 @@
 import json, pickle
 import sys
 import os.path as ospath
-from FoxDot import *
+#from FoxDot import *
 
 def main(args):
     pickleFile = args.file
     print("Loading "+pickleFile)
     with open(pickleFile,'rb') as j:
         data = pickle.load( j)
-        print(data)
+        print(data.keys())
         print(len(data["degree"]), "Compasses")
         
 
@@ -22,6 +22,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
 
-    print("Scale.minor", Scale.minor)
+    #print("Scale.minor", Scale.minor)
 
-    #main(args)
+    main(args)
