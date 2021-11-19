@@ -117,11 +117,19 @@ class MusicLearning:
 
 
     def expand(self, input, length = 4):
-        output = []+input
+        output = []
+        output.extend(input)
+        #print("input", input)
+        #print("output", output)
         for i in range(length):
-            prediction = self.pipeline.predict([output[:-self.inputlength]])
-            output += prediction[0]
-        
+            
+            next_bar = output[-self.inputlength:]
+            #print("next_bar", next_bar)
+            prediction = self.pipeline.predict([next_bar])
+            #print("prediction", prediction)
+            output.append(prediction[0])
+
+        #print("output", output)
         return output
 
 
@@ -156,7 +164,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Learn from data and test whether it works ok?')
     parser.add_argument('--model', help='Model name', default='bad_guy')
     parser.add_argument('--file', help='File to load learning data from')
-    parser.add_argument('--mode', help='What action to take', choices=['tpot', 'train', 'test'], default="train")
+    parser.add_argument('--mode', help='What action to take', choices=['tpot', 'train', 'test'], default="test")
     
     args = parser.parse_args()
     main(args)
