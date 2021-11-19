@@ -18,6 +18,7 @@ class MusicLearning:
     filename = ""
     inputlength=4
     outputlength=1
+    tpot_max_len = 10000
 
     def __init__(self, model) -> None:
         self.model = model
@@ -45,14 +46,14 @@ class MusicLearning:
 
         for compass in self.dataset:
             if len(compass) > self.inputlength:
-                print(compass)
                 for i in range(0, max(0,len(compass)-(self.inputlength+1))):
                     inputdata.append(compass[i:(i+self.inputlength-0)])
                     targetdata.append(compass[i+self.inputlength+0])
         
         self._data = np.array(inputdata)
         self._target = np.array(targetdata)
-    
+        print ("Data Set Contains "+ str(len(self._data))+" items")
+
     @property
     def model_file(self):
         return ospath.join('models',self.model+'.pickle')
@@ -88,8 +89,14 @@ class MusicLearning:
         return self._pipeline
 
     def getTpotModel(self):
+
+        prop = 1
+        if (len(self._data) > self.tpot_max_len):
+            prop = self.tpot_max_len / len(self._data)
+            print("Proportion of data used for TPot", prop)
+
         X_train, X_test, y_train, y_test = train_test_split(self.data, self.target,
-                                                            train_size=0.75, test_size=0.25)
+                                                            train_size=(0.75*prop), test_size=(0.25*prop))
 
         pipeline_optimizer = TPOTClassifier(generations=5, population_size=20, cv=5,
                                             random_state=42, verbosity=2)
