@@ -3,7 +3,6 @@ import sys
 import os.path as ospath
 from sklearn import datasets
 #from FoxDot import *
-from tpot import TPOTClassifier
 from sklearn.datasets import load_digits
 from sklearn.model_selection import train_test_split
 import numpy as np
@@ -17,7 +16,6 @@ class MusicLearning:
     model = ""
     filename = ""
     inputlength=4
-    outputlength=1
     tpot_max_len = 10000
 
     def __init__(self, model) -> None:
@@ -89,38 +87,45 @@ class MusicLearning:
         return self._pipeline
 
     def getTpotModel(self):
-
+        from tpot import TPOTClassifier
         prop = 1
-        if (len(self._data) > self.tpot_max_len):
-            prop = self.tpot_max_len / len(self._data)
+        data_len = len(self.data)
+        print("data_len", data_len, "self.tpot_max_len", self.tpot_max_len) 
+        if (data_len> self.tpot_max_len):
+            prop = self.tpot_max_len / data_len
             print("Proportion of data used for TPot", prop)
 
         X_train, X_test, y_train, y_test = train_test_split(self.data, self.target,
                                                             train_size=(0.75*prop), test_size=(0.25*prop))
 
         pipeline_optimizer = TPOTClassifier(generations=5, population_size=20, cv=5,
-                                            random_state=42, verbosity=2)
+                                            #random_state=42,
+                                             verbosity=2)
         pipeline_optimizer.fit(X_train, y_train)
         print(pipeline_optimizer.score(X_test, y_test))
         
         pipeline_optimizer.export(self.tpot_file)
 
-        pickleFile = self.pipeline_file
-        print("Saving "+pickleFile)
-        with open(pickleFile,'wb') as k:
-            pickle.dump(pipeline_optimizer.fitted_pipeline_, k)
-
         self._pipeline = pipeline_optimizer.fitted_pipeline_
+
+        self.save_pipeline()
 
     def trainModel(self):
         X_train, X_test, y_train, y_test = train_test_split(self.data, self.target,
                                                             train_size=0.75, test_size=0.25)
 
         self.pipeline.fit(X_train, y_train)
-        results = self.pipeline.predict(X_test)
-        
+        #results = self.pipeline.predict(X_test)
+        print(self.pipeline.score(X_test, y_test))
         #results = self.pipeline.predict([[7,7,10,7], [7,10,7,5]])
-        return results
+        #return results
+        self.save_pipeline()
+
+    def save_pipeline(self):
+        pickleFile = self.pipeline_file
+        print("Saving "+pickleFile)
+        with open(pickleFile,'wb') as k:
+            pickle.dump(self.pipeline, k)
 
 
     def expand(self, input, length = 4):
@@ -149,29 +154,32 @@ def main(args):
     if(pickleFile == None):
         pickleFile = ospath.join('output',modelName+'.pickle')
     
-    print("Loading "+pickleFile)
     if args.mode == "tpot":
+        print("Loading "+pickleFile)
         with open(pickleFile,'rb') as j:
             data = pickle.load(j)
             ml.set_data(data['degree'])
             ml.getTpotModel()
 
     if args.mode == 'train':
+        print("Loading "+pickleFile)
         with open(pickleFile,'rb') as j:
             data = pickle.load(j)
             ml.set_data(data['degree'])
             ml.trainModel()
         
     if args.mode == 'test':
-        expanded = ml.expand([7,7,10,5]) 
+        expanded = ml.expand([0,2,1,3,4,6,2,3,5],20) 
         print(expanded)
 
 if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description='Learn from data and test whether it works ok?')
-    parser.add_argument('--model', help='Model name', default='bad_guy')
+    parser.add_argument('--model', help='Model name', default='bach')
     parser.add_argument('--file', help='File to load learning data from')
     parser.add_argument('--mode', help='What action to take', choices=['tpot', 'train', 'test'], default="test")
     
     args = parser.parse_args()
+    #print (args)
+    
     main(args)
