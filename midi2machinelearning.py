@@ -1,5 +1,6 @@
 from copy import Error
-from music21 import converter, instrument, note, chord, corpus, analysis, pitch
+from enum import unique
+from music21 import converter, instrument, note, chord, corpus, analysis, pitch, scale
 import json, pickle
 import sys
 import os.path as ospath
@@ -7,36 +8,22 @@ import os.path as ospath
 #from os import *
 from FoxDot import *
 
-def extractNote(element):
-    return int(element.pitch.ps)
 
 def extractDuration(element):
     return element.duration.quarterLength
 
-def extractAmplitude(element):
-    if element.isRest:
-        return 0
-    else:
-        return 1
-
-def midi2note(n):
-    return n - 60
-
-def midiNotes2notes(notes):
-    return [tuple(map(lambda x:midi2note(x),list(note))) for note in notes]
 
 
-def midiNotes2KeyedNotes(part):
-    
-    ka = analysis.floatingKey.KeyAnalyzer(part)
-    
-    #ka.windowSize = 2
-    out = ka.run()
-    print ("out", out)
-    return [tuple(map(lambda x:midi2note(x),list(note))) for note in notes]
+def getFoxDotFromPitch(ps, pitchesToFoxDot):
+        if(ps == -1):
+            return 0
+        try :
+            return pitchesToFoxDot[ps]
+        except KeyError:
+            print("KeyError ps", ps )
+            return getFoxDotFromPitch(ps - 1, pitchesToFoxDot)
 
-def get_notes(notes_to_parse):
-
+def get_notes(notes_to_parse, pitchesToFoxDot):
     """ Get all the notes and chords from the midi files in the ./midi_songs directory """
     amps = []
     durations = []
@@ -44,138 +31,22 @@ def get_notes(notes_to_parse):
     start = []
 
     for element in notes_to_parse:
-        if isinstance(element, note.Note):
-            start.append(element.offset)
-            notes.append((extractNote(element),))
+        if element.isRest:
+            restinst = rest(extractDuration(element))
+            notes.append(restinst)
+            durations.append(restinst)
+        elif isinstance(element, note.Note):
+            notes.append(getFoxDotFromPitch(element.pitch.ps,pitchesToFoxDot))
             durations.append(extractDuration(element))
-            amps.append(extractAmplitude(element))
-                
         elif isinstance(element, chord.Chord):
-            start.append(element.offset)
             durations.append(extractDuration(element))
-            amps.append(extractAmplitude(element))
-            notes.append(tuple([extractNote(n) for n in element.notes]))
+            notes.append(tuple([getFoxDotFromPitch(n.pitch.ps,pitchesToFoxDot) for n in element.notes]))
+        else:
+            print("No action for element", element)
 
+    #print("notes", notes)
     return start, notes, durations, amps
 
-def findFreeSpace(note_start,last_ends):
-    #print(note_start, last_ends)
-    for k, last_end in last_ends.items():
-        if last_end <= note_start:
-            return k
-    return -1
-    
-def notesProcessing(values,notePerCompass, nCompass):
-    length = notePerCompass*nCompass
-
-    notes_info = list(zip(values[0],values[1],values[2],values[3]))
-    #notes_info = sorted(notes_info, key=lambda x : x[0])
-    notes_info = sorted(list(filter(lambda x : x[0] + 4 < length, notes_info)), key=lambda x : x[0])
-    
-    notes_per_beat = {str(k): [] for k in map(lambda x : x[0], notes_info)}
-
-    for note in notes_info:
-        notes_per_beat[str(note[0])].append(note)
-
-    notes_at_the_same_time = max(map(len,notes_per_beat.values()))
-    #print(notes_at_the_same_time)
-    final_notes = []
-    final_durs = []
-    final_amps = []
-
-    final_data = {str(i):([],[],[],[]) for i in range(notes_at_the_same_time)}
-    last_ends = {str(i):0 for i in range(notes_at_the_same_time)}
-
-    for _, notes_data in notes_per_beat.items():
-        for note_data in notes_data:
-            k = findFreeSpace(note_data[0],last_ends)
-            if k != -1:
-                start, notes, durations, amps = final_data[k]
-                last_end = last_ends[k]
-                if last_end < note_data[0]:
-                    start.append(last_end)
-                    notes.append((0,))
-                    durations.append(note_data[0]-last_end)
-                    #durations.append("rest("+str(note_data[0]-last_end)+")")
-                    amps.append(0)
-
-                start.append(note_data[0])
-                notes.append(note_data[1])
-                durations.append(note_data[2])
-                amps.append(note_data[3])
-
-                if note_data[0] + note_data[2] > last_end:
-                    last_ends[k] = note_data[0] + note_data[2]
-
-    for k,v in final_data.items():
-        start, notes, durations, amps = v
-        if sum(durations) < length:
-            start.append(-1)
-            notes.append((0,))
-            durations.append(length - sum(durations))
-            amps.append(0)
-            
-    return final_data
-
-def intoCompasses(notes,dur,amps,notePerCompass, nCompass):
-    notes_comp = []
-    dur_comp = []
-    amps_comp = []
-    
-    i = 0
-    j = 0
-    while j < len(dur):
-        if sum(dur[i:j]) == notePerCompass:
-            notes_comp.append(notes[i:j])
-            dur_comp.append(dur[i:j])
-            amps_comp.append(amps[i:j])
-            i = j
-
-        if sum(dur[i:j]) > notePerCompass:
-            notes_comp.append(notes[i:j])
-            dur_comp.append(dur[i:j-1] + [notePerCompass-sum(dur[i:j-1])])
-            amps_comp.append(amps[i:j])
-            
-            notes = notes[:j] + [notes[j-1]] + notes[j:]
-            amps = amps[:j] + [amps[j-1]] + amps[j:]
-            dur = dur[:j] + [(sum(dur[i:j]) - notePerCompass)] + dur[j:]
-
-            i = j
-            
-        j+=1
-    #print(list(map(sum,dur_comp)))
-    return notes_comp,dur_comp,amps_comp
-
-def simplifyNote(n):
-    if len(n)>1:
-        return n
-    elif len(n)==1:
-        return n[0]
-
-def simplifyNoteF(n):
-    return n[0]
-
-def simplifyNotes(notes, chords=False):
-    if chords:
-        notes =  list(map(simplifyNote, notes))
-    else:
-        notes =  list(map(simplifyNoteF, notes))
-
-    pure = list(filter(lambda n : (isinstance(n, int) and n >- 60), notes))
-
-    clean = []
-    for i in range(len(notes)):
-        if isinstance(notes[i], int)==False or notes[i] > -60 :
-            clean.append(notes[i])
-        else:
-            if len(clean) > 0:
-                clean.append(clean[-1])
-            elif isinstance(notes[(i+1)%len(notes)], int) == False or notes[(i+1)%len(notes)] > -60:
-                clean.append(notes[(i+1)%len(notes)])
-            elif(len(pure) > 0):
-                clean.append(pure[i%len(pure)])
- 
-    return clean
 
 def main(args):
     filename = ""
@@ -219,7 +90,7 @@ def main(args):
             }
             
             pickleFile = ospath.join("output",filename + ".pickle")
-            if(ospath.isfile(pickleFile)):
+            if(ospath.isfile(pickleFile) and not args.force):
                 print("loading "+pickleFile)
                 with open(pickleFile,'rb') as j:
                     newdata = pickle.load(j)
@@ -256,7 +127,16 @@ def main(args):
             print("Can't parse "+str(args.corpus))
             print(e)
         
-        
+def get_unique_numbers(numbers):
+    unique = []
+
+    for number in numbers:
+        if number in unique:
+            continue
+        else:
+            unique.append(number)
+    return unique
+
 
 def process_midi(mid, filename, chords=False):
     output_data = {
@@ -270,78 +150,62 @@ def process_midi(mid, filename, chords=False):
 
     allinstruments=[]
     instruments = instrument.partitionByInstrument(mid)
+    if (len(instruments) == 0):
+        instruments = [instruments]
+
     for instr in instruments:
         ##newinstrs = instrument.unbundleInstruments(instr)
         minoctave = None
         maxoctave = None
-
+        
+        #print(instr.parts.keys())
         
         try :
             minoctave = min(instr[note.Note]).octave
             maxoctave = max(instr[note.Note]).octave
-
         except Exception:
-            print("No minOctave")
+            pass
+            #print("No minOctave")
         
         analyzedKey = None
         try :
             analyzedKey = instr.analyze('key')
             
         except Exception:
-            print("No analyzedKey")
-
-
-        print("minoctave", minoctave,"maxoctave", maxoctave, "analyzedKey", analyzedKey)
-        #ConcreteScale.getPitches(minPitch=None, maxPitch=None, direction=None) → List[music21.pitch.Pitch]
+            pass
+            #print("No analyzedKey")
 
         if (minoctave and analyzedKey):
-
             #analyzedKey.mode
             #analyzedKey.tonic
+            uniquepitches = get_unique_numbers([n.pitch for n in instr[note.Note]])
+            lowest = min(uniquepitches)
+            highest = max(uniquepitches)
+            uniquecount = len(uniquepitches)
+            sc = None
             rootPitch =  pitch.Pitch(analyzedKey.tonic, octave=minoctave)
-            print("rootPitch", rootPitch)
+            if (analyzedKey.mode == "major"):
+                sc = scale.MajorScale(rootPitch)
+            elif (analyzedKey.mode == "minor"):
+                sc = scale.MinorScale(rootPitch)
+            elif (analyzedKey.mode == "chromatic"):
+                sc = scale.ChromaticScale(rootPitch)
 
-            allinstruments.append( {"part":instr, minoctave:minoctave, analyzedKey:analyzedKey })
-            
-    for instr in allinstruments: 
-        print("instr.partName", instr['part'].partName)
-
-    exit()
-
-
-    
-
-    if(instruments == None or len(instruments) == 0):
-        data["instrument_0"] = get_notes(mid)
-    else:
-        for instrument_i in instruments.parts:
-            notes_to_parse = instrument_i.recurse()
-
-            if instrument_i.partName is None:
-                data["instrument_{}".format(i)] = get_notes(notes_to_parse)
-                i+=1
-            else:
-                data[instrument_i.partName] = get_notes(notes_to_parse)
-
-    print("data keys", data.keys())            
-
-    notePerCompass = 16
-    nCompass = 30
-    i = 0
-    u = 0
-    final_compas = [[] for _ in range(nCompass)]
-    for k, v in data.items():
-        if len(v[0]) > 0 and len(v[1]) > 0:
-            values = list(data.values())
-            values_i = values[i]
-            final_data = notesProcessing(values_i,notePerCompass,nCompass)
-            for final_v in final_data.values():
+            if(uniquecount >= 8 and sc != None):
+                scalepitches = sc.getPitches(lowest, highest)
+                rootPos = scalepitches.index(rootPitch)
+                pitchesToFoxDot = {scalepitches[i].ps:(i-rootPos) for i in range(len(scalepitches))}
+                fd_notes = get_notes(instr[note.Note], pitchesToFoxDot)
                 
-                dur = final_v[2]
-                amps = final_v[3]
-                notes_comp, dur_comp, amps_comp = intoCompasses(final_v[1],dur,amps,notePerCompass,nCompass)
-                notes_comp = midiNotes2notes(notes_comp)
-                for j in range(len(notes_comp)):
+
+                allinstruments.append( {"part":instr, "root":rootPitch.name ,"octave":minoctave, "scale":analyzedKey.mode, "pitchesToFoxDot":pitchesToFoxDot, "fd_notes":fd_notes })
+
+
+    for instr in allinstruments: 
+        print(instr['part'].partName,":\t", instr["root"], "octave", instr["octave"],  instr["scale"])#, instr["pitchesToFoxDot"], pitchesToFoxDot)
+
+'''    
+
                     dur_export = []
                     dur_json = []
                     dur_strings = []
@@ -371,7 +235,9 @@ def process_midi(mid, filename, chords=False):
 
     final_compas = list(filter(lambda x : len(x) > 0, final_compas))
     i = 0
+'''
 
+'''
     if(len(output_data["degree"])):
         outputFile =  ospath.join("output",filename + ".py")
         print("Saving "+outputFile)
@@ -393,7 +259,7 @@ def process_midi(mid, filename, chords=False):
         print("No Data to save for " + filename)
 
     return output_data
-
+'''
 
 if __name__ == "__main__":
     import argparse
@@ -403,7 +269,7 @@ if __name__ == "__main__":
     parser.add_argument('--corpus', help='file from corpus \nhttp://web.mit.edu/music21/doc/about/referenceCorpus.html', default='bach/bwv108.6.xml')
     parser.add_argument('--composer', help='Music21 Composer info to learn from')
     parser.add_argument('--chords', action='store_true', help='keep chords')
-
+    parser.add_argument('--force', action='store_true', help='Force')
 
     args = parser.parse_args()
 
