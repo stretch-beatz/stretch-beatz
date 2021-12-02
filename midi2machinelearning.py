@@ -1,18 +1,19 @@
 from copy import Error
 from enum import unique
-from music21 import converter, instrument, note, chord, corpus, analysis, pitch, scale
+from inspect import trace
+from os import linesep
+from music21 import converter, duration, instrument, note, chord, corpus, analysis, pitch, scale
 import json, pickle
-import sys
+import sys, numbers
 import os.path as ospath
 #from os.path import splitext, basename
 #from os import *
 from FoxDot import *
-
+from music21.environment import envSingleton
+WINDOW_SIZE = 4
 
 def extractDuration(element):
     return element.duration.quarterLength
-
-
 
 def getFoxDotFromPitch(ps, pitchesToFoxDot):
         if(ps == -1):
@@ -25,11 +26,9 @@ def getFoxDotFromPitch(ps, pitchesToFoxDot):
 
 def get_notes(notes_to_parse, pitchesToFoxDot):
     """ Get all the notes and chords from the midi files in the ./midi_songs directory """
-    amps = []
     durations = []
     notes = []
-    start = []
-
+    
     for element in notes_to_parse:
         if element.isRest:
             restinst = rest(extractDuration(element))
@@ -45,8 +44,10 @@ def get_notes(notes_to_parse, pitchesToFoxDot):
             print("No action for element", element)
 
     #print("notes", notes)
-    return start, notes, durations, amps
-
+    fd_notes = get_degrees_training_data(notes)
+    fd_durations = get_durations_training_data(durations)
+                
+    return notes, durations, fd_notes, fd_durations
 
 def main(args):
     filename = ""
@@ -63,98 +64,133 @@ def main(args):
         try:
             mid = converter.parse(args.midi)
             filename, ext = ospath.splitext(ospath.basename(args.midi))
-            process_midi(mid, filename, args.chords)
+            degrees, durations = process_midi(mid, filename, args.chords)
         except Exception as e:
             print("Can't parse "+str(args.midi))
-            print(e)
+            trace(e)
         
     elif (args.composer != None):
         #http://web.mit.edu/music21/doc/about/referenceCorpus.html
         composer = corpus.getComposer(args.composer)
-        for filecorp in composer: 
-            try:
-                mid = corpus.parse(filecorp)
-            except Exception as e:
-                print("Can't parse "+str(filecorp))
-                print(e)
-                continue    
-            
-            basenamef = ospath.basename(filecorp)
-            #print("basenamef",basenamef)
-            filename, ext = ospath.splitext(basenamef)
-            
-            newdata = {
-                "degree":[],
-                "dur":[],
-                "dur_json":[]
-            }
-            
-            pickleFile = ospath.join("output",filename + ".pickle")
-            if(ospath.isfile(pickleFile) and not args.force):
-                print("loading "+pickleFile)
-                with open(pickleFile,'rb') as j:
-                    newdata = pickle.load(j)
-            else:
-                newdata = process_midi(mid, filename, args.chords)
-            
-            output_data["degree"] += newdata["degree"]
-            output_data["dur"] += newdata["dur"]
-            output_data["dur_json"] += newdata["dur_json"]
+        degrees = []#loadTraining(composer, "degrees")
         
-        jsonFile = ospath.join("output",args.composer + ".json")
-        out_json =  {
-            "degree":output_data["degree"],
-            "dur":output_data["dur_json"]
-        }
-        print("Saving "+jsonFile)
-        with open(jsonFile,'w') as j:
-            json.dump(out_json, j)
+        if (len(degrees) == 0 ):
+            durations = []#loadTraining(composer, "durations")
+            
+            for filecorp in composer: 
+                try:
+                    mid = corpus.parse(filecorp)
+                except Exception as e:
+                    print("Can't parse "+str(filecorp))
+                    trace(e)
+                    continue    #
+                
+                basenamefile = ospath.basename(filecorp)
+                #print("basenamefile",basenamefile)
+                filename, ext = ospath.splitext(basenamefile)
 
-        pickleFile = ospath.join("output",args.composer + ".pickle")
-        print("Saving "+pickleFile)
-        with open(pickleFile,'wb') as k:
-            pickle.dump(output_data, k)
-    
+                newdegrees = loadTraining(filename, "degrees")
+                newdurations = loadTraining(filename, "durations")
+
+                
+                if(len(newdegrees) == 0):
+                    newdegrees, newdurations = process_midi(mid, filename, args.chords)
+                
+                degrees.extend(newdegrees)
+                durations.extend(newdurations)
+                        
+            saveTraining(degrees, args.composer, "degrees")
+            saveTraining(durations, args.composer, "durations")
+
     elif (args.corpus != None):
         #http://web.mit.edu/music21/doc/about/referenceCorpus.html
         try:
             mid = corpus.parse(args.corpus)
-            basenamef = ospath.basename(args.corpus)
+            basenamefile = ospath.basename(args.corpus)
+            
             #print("basenamef",basenamef)
-            filename, ext = ospath.splitext(basenamef)
+            filename, ext = ospath.splitext(basenamefile)
             process_midi(mid, filename, args.chords)
         except Exception as e:
             print("Can't parse "+str(args.corpus))
-            print(e)
+            trace(e)
         
-def get_unique_numbers(numbers):
+
+        
+def get_unique_numbers(number_list):
     unique = []
 
-    for number in numbers:
-        if number in unique:
+    for num in number_list:
+        if num in unique:
             continue
         else:
-            unique.append(number)
+            unique.append(num)
     return unique
 
+def get_degrees_training_data(degree_inputs):
+    degrees = list(filter(lambda x: isinstance(x, numbers.Number) , degree_inputs))
+    training = []
+    for i in range(0, max(0,len(degrees)-( WINDOW_SIZE + 1))):
+        training.append(degrees[i:(i+WINDOW_SIZE+1)])
+    #print("training", training)
+    return training
+
+def loadTraining( modelname, modeltype):
+    import csv
+    training = []
+    csvFilePath = ospath.join("output", modelname + "_" + modeltype + ".csv")
+    print("Loading", csvFilePath)
+    if(ospath.isfile(csvFilePath)):
+        with open(csvFilePath, 'r', newline= "\n") as csvfile:
+            spamreader= csv.reader(csvfile, quoting = csv.QUOTE_NONNUMERIC)
+            for row in spamreader:
+                if len(row) and (row[0] != 't1'):
+                    training.append(row)
+    
+    return training
+
+def saveTraining(training, modelname, modeltype):
+    import csv
+    if (len(training) == 0):
+        return False
+    print("modelname", modelname , "modeltype", modeltype)
+    csvFilePath = ospath.join("output", (modelname + "_" + modeltype + ".csv"))
+    print("Saving", csvFilePath)
+    #print("training[0]", training[0])
+    with open(csvFilePath, 'w', newline= "\n") as csvfile:
+        spamwriter = csv.writer(csvfile, quoting = csv.QUOTE_NONNUMERIC)        
+        data_len = len(training[0]) - 1
+        header = ['i'+str(i+1) for i in range(data_len)]
+        header.append("target")
+        #print("header", header)
+        spamwriter.writerow(header)
+        for arr in training:
+            if(not all([i==arr[0] for i in arr])):
+                spamwriter.writerow(arr)
+
+def get_fd_dur_data(dur):
+    if isinstance(dur, rest):
+        return float(-1 * rest.dur)
+    else:
+        return float(dur)
+
+def get_durations_training_data(durations_inputs):
+    durations = list(map(get_fd_dur_data , durations_inputs))
+    training = []
+    for i in range(0, max(0,len(durations)-( WINDOW_SIZE + 1))):
+        training.append(durations[i:(i+WINDOW_SIZE+1)])
+    print("durations training", durations)
+    
+    return training
 
 def process_midi(mid, filename, chords=False):
-    output_data = {
-        "degree":[],
-        "dur":[],
-        "dur_json":[]
-    }
-
-    data = {}
-    i = 0
-
     allinstruments=[]
     instruments = instrument.partitionByInstrument(mid)
-    if (len(instruments) == 0):
-        instruments = [instruments]
+    if (instruments == None or len(instruments) == 0):
+        instruments = [mid]
 
     for instr in instruments:
-        ##newinstrs = instrument.unbundleInstruments(instr)
+        #newinstrs = instrument.unbundleInstruments(instr)
         minoctave = None
         maxoctave = None
         
@@ -193,73 +229,38 @@ def process_midi(mid, filename, chords=False):
 
             if(uniquecount >= 8 and sc != None):
                 scalepitches = sc.getPitches(lowest, highest)
-                rootPos = scalepitches.index(rootPitch)
-                pitchesToFoxDot = {scalepitches[i].ps:(i-rootPos) for i in range(len(scalepitches))}
-                fd_notes = get_notes(instr[note.Note], pitchesToFoxDot)
                 
+                try:
+                    rootPos = scalepitches.index(rootPitch)
+                    pitchesToFoxDot = {scalepitches[i].ps:(i-rootPos) for i in range(len(scalepitches))}
 
-                allinstruments.append( {"part":instr, "root":rootPitch.name ,"octave":minoctave, "scale":analyzedKey.mode, "pitchesToFoxDot":pitchesToFoxDot, "fd_notes":fd_notes })
+                    notes, durations, fd_notes, fd_durations = get_notes(instr[note.Note], pitchesToFoxDot)
+                    allinstruments.append( {
+                        "part":instr, 
+                        "root":rootPitch.name,
+                        "octave":minoctave, 
+                        "scale":analyzedKey.mode, 
+                        "pitchesToFoxDot":pitchesToFoxDot, 
+                        "degree":fd_notes, 
+                        "dur":fd_durations 
+                    })
+
+                except ValueError:
+                    print("rootPitch", rootPitch, "not in scalepitches", scalepitches)
 
 
+    degrees = []
+    durations = []
+    
     for instr in allinstruments: 
-        print(instr['part'].partName,":\t", instr["root"], "octave", instr["octave"],  instr["scale"])#, instr["pitchesToFoxDot"], pitchesToFoxDot)
+        #print(instr['part'].partName,":\t", instr["root"], "octave", instr["octave"],  instr["scale"])
+        degrees.extend(instr['degree'])
+        durations.extend(instr['dur'])
 
-'''    
+    saveTraining(degrees, filename, "degrees")
+    saveTraining(durations, filename, "durations")
 
-                    dur_export = []
-                    dur_json = []
-                    dur_strings = []
-                    for k in range(len(dur_comp[j])):
-                        if amps_comp[j][k] > 0:
-                            dur_strings.append(str(dur_comp[j][k]))
-                            dur_json.append(float(dur_comp[j][k]))
-                            dur_export.append(float(dur_comp[j][k]))
-                        else:
-                            dur_strings.append("rest("+str(dur_comp[j][k])+")")
-                            dur_json.append(-1*float(dur_comp[j][k]))
-                            dur_export.append(rest(float(dur_comp[j][k])))
-                            
-
-                    dur_string = " ,".join(dur_strings)
-                    simple_notes = list(map(simplifyNote, notes_comp[j]))
-
-                    output_data["degree"].append(simplifyNotes(notes_comp[j],chords))
-                    output_data["dur"].append(dur_export)
-                    output_data["dur_json"].append(dur_json)
-
-
-                    final_compas[j].append("\td{} >> pluck({},dur=[{}])\n".format(u,simple_notes,dur_string))
-                    #final_compas[j].append("\td{} >> pluck({},dur={},amp={})\n".format(u,notes_comp[j],dur_comp[j],amps_comp[j]))
-                u += 1
-        i+=1
-
-    final_compas = list(filter(lambda x : len(x) > 0, final_compas))
-    i = 0
-'''
-
-'''
-    if(len(output_data["degree"])):
-        outputFile =  ospath.join("output",filename + ".py")
-        print("Saving "+outputFile)
-
-        jsonFile = ospath.join("output",filename + ".json")
-        out_json =  {
-            "degree":output_data["degree"],
-            "dur":output_data["dur_json"]
-        }
-        print("Saving "+jsonFile)
-        with open(jsonFile,'w') as j:
-            json.dump(out_json, j)
-        
-        pickleFile = ospath.join("output",filename + ".pickle")
-        print("Saving "+pickleFile)
-        with open(pickleFile,'wb') as k:
-            pickle.dump(output_data, k)
-    else:
-        print("No Data to save for " + filename)
-
-    return output_data
-'''
+    return degrees, durations
 
 if __name__ == "__main__":
     import argparse
