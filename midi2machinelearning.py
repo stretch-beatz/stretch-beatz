@@ -21,8 +21,12 @@ def getFoxDotFromPitch(ps, pitchesToFoxDot):
     try :
         return int(pitchesToFoxDot[ps])
     except KeyError:
-        print("KeyError ps", ps )
-        return getFoxDotFromPitch(ps - 1, pitchesToFoxDot)
+        #Key has probably changed 
+        # TODO : cope with changing key (need to sort that out)
+        pass
+        #print("KeyError ps", ps )
+        #return getFoxDotFromPitch(ps - 1, pitchesToFoxDot)
+
 
 def get_notes(notes_to_parse, pitchesToFoxDot):
     """ Get all the notes and chords from the midi files in the ./midi_songs directory """
@@ -180,23 +184,27 @@ def process_midi(mid, filename, chords=False):
     instruments = instrument.partitionByInstrument(mid)
     if (instruments == None or len(instruments) == 0):
         instruments = [mid]
-    '''
+    
+    defaultAnalyzedKey = False
+    
     try :
         ka = analysis.floatingKey.KeyAnalyzer(mid)
-        ka.windowSize = 2
+        ka.windowSize = 16
         out = ka.run()
-        print ("overall floatingKey", out)
+        #print ("overall floatingKey", out)
+        defaultAnalyzedKey = out[0]
     except Exception:
         #pass
         print("No Over All Floating Key")
-    ''' 
+    
 
-    try : 
-        defaultAnalyzedKey = mid.analyze('key')
-        #print("overall analyzedKey", analyzedKey)
-    except Exception:
-        defaultAnalyzedKey = False #pass
-        #print("overall No analyzedKey")
+    if (defaultAnalyzedKey == False):
+        try : 
+            defaultAnalyzedKey = mid.analyze('key')
+            #print("overall analyzedKey", analyzedKey)
+        except Exception:
+            defaultAnalyzedKey = False #pass
+            #print("overall No analyzedKey")
 
     for instr in instruments:
         minoctave = None
@@ -241,7 +249,7 @@ def process_midi(mid, filename, chords=False):
                 sc = scale.ChromaticScale(rootPitch)
 
             if(uniquecount >= 8 and sc != None):
-                scalepitches = sc.getPitches(lowest, highest)
+                scalepitches = sc.getPitches(min(lowest, rootPitch), highest)
                 
                 try:
                     rootPos = scalepitches.index(rootPitch)
