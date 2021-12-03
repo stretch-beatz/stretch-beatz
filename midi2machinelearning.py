@@ -108,7 +108,6 @@ def main(args):
             mid = corpus.parse(args.corpus)
             basenamefile = ospath.basename(args.corpus)
             
-            #print("basenamef",basenamef)
             filename, ext = ospath.splitext(basenamefile)
             process_midi(mid, filename, args.chords)
         except Exception as e:
@@ -190,18 +189,14 @@ def process_midi(mid, filename, chords=False):
         instruments = [mid]
 
     for instr in instruments:
-        #newinstrs = instrument.unbundleInstruments(instr)
         minoctave = None
         maxoctave = None
-        
-        #print(instr.parts.keys())
         
         try :
             minoctave = min(instr[note.Note]).octave
             maxoctave = max(instr[note.Note]).octave
         except Exception:
             pass
-            #print("No minOctave")
         
         analyzedKey = None
         try :
