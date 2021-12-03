@@ -43,7 +43,6 @@ def get_notes(notes_to_parse, pitchesToFoxDot):
         else:
             print("No action for element", element)
 
-    #print("notes", notes)
     fd_notes = get_degrees_training_data(notes)
     fd_durations = get_durations_training_data(durations)
                 
@@ -59,7 +58,6 @@ def main(args):
         "dur_json":[]
     }
 
-    #print("args", args)   
     if (args.midi != None):
         try:
             mid = converter.parse(args.midi)
@@ -86,7 +84,6 @@ def main(args):
                     continue    #
                 
                 basenamefile = ospath.basename(filecorp)
-                #print("basenamefile",basenamefile)
                 filename, ext = ospath.splitext(basenamefile)
 
                 if(args.force == False ):
@@ -131,7 +128,6 @@ def get_degrees_training_data(degree_inputs):
     training = []
     for i in range(0, max(0,len(degrees)-( WINDOW_SIZE + 1))):
         training.append(degrees[i:(i+WINDOW_SIZE+1)])
-    #print("training", training)
     return training
 
 def loadTraining( modelname, modeltype):
@@ -155,13 +151,11 @@ def saveTraining(training, modelname, modeltype):
     print("modelname", modelname , "modeltype", modeltype)
     csvFilePath = ospath.join("output", (modelname + "_" + modeltype + ".csv"))
     print("Saving", csvFilePath)
-    #print("training[0]", training[0])
     with open(csvFilePath, 'w', newline= "\n") as csvfile:
         spamwriter = csv.writer(csvfile, quoting = csv.QUOTE_NONNUMERIC)        
         data_len = len(training[0]) - 1
         header = ['i'+str(i+1) for i in range(data_len)]
         header.append("target")
-        #print("header", header)
         spamwriter.writerow(header)
         for arr in training:
             if(not all([i==arr[0] for i in arr])):
@@ -178,7 +172,6 @@ def get_durations_training_data(durations_inputs):
     training = []
     for i in range(0, max(0,len(durations)-( WINDOW_SIZE + 1))):
         training.append(durations[i:(i+WINDOW_SIZE+1)])
-    print("durations training", durations)
     
     return training
 
@@ -187,6 +180,23 @@ def process_midi(mid, filename, chords=False):
     instruments = instrument.partitionByInstrument(mid)
     if (instruments == None or len(instruments) == 0):
         instruments = [mid]
+    '''
+    try :
+        ka = analysis.floatingKey.KeyAnalyzer(mid)
+        ka.windowSize = 2
+        out = ka.run()
+        print ("overall floatingKey", out)
+    except Exception:
+        #pass
+        print("No Over All Floating Key")
+    ''' 
+
+    try : 
+        defaultAnalyzedKey = mid.analyze('key')
+        #print("overall analyzedKey", analyzedKey)
+    except Exception:
+        defaultAnalyzedKey = False #pass
+        #print("overall No analyzedKey")
 
     for instr in instruments:
         minoctave = None
@@ -199,13 +209,21 @@ def process_midi(mid, filename, chords=False):
             pass
         
         analyzedKey = None
-        try :
-            analyzedKey = instr.analyze('key')
-            
+        '''try :
+            ka = analysis.floatingKey.KeyAnalyzer(instr)
+            ka.windowSize = 2
+            out = ka.run()
+            print ("out", out)
         except Exception:
             pass
-            #print("No analyzedKey")
+            #print("No Floating Key")
+        '''
 
+        try : 
+            analyzedKey = instr.analyze('key')
+        except Exception:
+            analyzedKey = defaultAnalyzedKey
+    
         if (minoctave and analyzedKey):
             #analyzedKey.mode
             #analyzedKey.tonic
@@ -248,7 +266,6 @@ def process_midi(mid, filename, chords=False):
     durations = []
     
     for instr in allinstruments: 
-        #print(instr['part'].partName,":\t", instr["root"], "octave", instr["octave"],  instr["scale"])
         degrees.extend(instr['degree'])
         durations.extend(instr['dur'])
 
