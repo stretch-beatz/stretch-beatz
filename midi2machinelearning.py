@@ -16,13 +16,13 @@ def extractDuration(element):
     return element.duration.quarterLength
 
 def getFoxDotFromPitch(ps, pitchesToFoxDot):
-        if(ps == -1):
-            return 0
-        try :
-            return pitchesToFoxDot[ps]
-        except KeyError:
-            print("KeyError ps", ps )
-            return getFoxDotFromPitch(ps - 1, pitchesToFoxDot)
+    if(ps == -1):
+        return 0
+    try :
+        return int(pitchesToFoxDot[ps])
+    except KeyError:
+        print("KeyError ps", ps )
+        return getFoxDotFromPitch(ps - 1, pitchesToFoxDot)
 
 def get_notes(notes_to_parse, pitchesToFoxDot):
     """ Get all the notes and chords from the midi files in the ./midi_songs directory """
@@ -89,11 +89,11 @@ def main(args):
                 #print("basenamefile",basenamefile)
                 filename, ext = ospath.splitext(basenamefile)
 
-                newdegrees = loadTraining(filename, "degrees")
-                newdurations = loadTraining(filename, "durations")
-
+                if(args.force == False ):
+                    newdegrees = loadTraining(filename, "degrees")
+                    newdurations = loadTraining(filename, "durations")
                 
-                if(len(newdegrees) == 0):
+                if(args.force == True or len(newdegrees) == 0):
                     newdegrees, newdurations = process_midi(mid, filename, args.chords)
                 
                 degrees.extend(newdegrees)
@@ -143,10 +143,10 @@ def loadTraining( modelname, modeltype):
     if(ospath.isfile(csvFilePath)):
         with open(csvFilePath, 'r', newline= "\n") as csvfile:
             spamreader= csv.reader(csvfile, quoting = csv.QUOTE_NONNUMERIC)
-            for row in spamreader:
-                if len(row) and (row[0] != 't1'):
+            for count, row in enumerate(spamreader):
+                if len(row) and (count > 0):
                     training.append(row)
-    
+
     return training
 
 def saveTraining(training, modelname, modeltype):
