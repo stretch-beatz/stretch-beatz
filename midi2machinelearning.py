@@ -156,7 +156,7 @@ def saveTraining(training, modelname, modeltype):
     csvFilePath = ospath.join("output", (modelname + "_" + modeltype + ".csv"))
     print("Saving", csvFilePath)
     with open(csvFilePath, 'w', newline= "\n") as csvfile:
-        spamwriter = csv.writer(csvfile, quoting = csv.QUOTE_NONNUMERIC)        
+        spamwriter = csv.writer(csvfile, quoting = csv.QUOTE)        
         data_len = len(training[0]) - 1
         header = ['i'+str(i+1) for i in range(data_len)]
         header.append("target")
