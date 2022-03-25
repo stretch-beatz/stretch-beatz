@@ -2,7 +2,7 @@ from music21 import converter, instrument, note, chord, corpus
 import json, pickle
 import sys
 import os.path as ospath
-#from os.path import splitext, basename
+from os import makedirs
 #from os import *
 from FoxDot import *
 
@@ -207,19 +207,22 @@ def main(args):
                 "dur_json":[]
             }
             
-            pickleFile = ospath.join("output",filename + ".pickle")
+            pickleFile = ospath.join("pickle",args.composer,filename + ".pickle")
             if(ospath.isfile(pickleFile)):
                 print("loading "+pickleFile)
                 with open(pickleFile,'rb') as j:
                     newdata = pickle.load(j)
             else:
-                newdata = process_midi(mid, filename, args.chords)
+                pickleFolder = ospath.join("pickle",args.composer)
+                if(ospath.isdir(pickleFolder) == False):
+                    makedirs(pickleFolder)
+                newdata = process_midi(mid, filename, args.chords, composer=args.composer)
             
             output_data["degree"] += newdata["degree"]
             output_data["dur"] += newdata["dur"]
             output_data["dur_json"] += newdata["dur_json"]
         
-        jsonFile = ospath.join("output",args.composer + ".json")
+        jsonFile = ospath.join("json",args.composer + ".json")
         out_json =  {
             "degree":output_data["degree"],
             "dur":output_data["dur_json"]
@@ -228,7 +231,10 @@ def main(args):
         with open(jsonFile,'w') as j:
             json.dump(out_json, j)
 
-        pickleFile = ospath.join("output",args.composer + ".pickle")
+        pickleFile = ospath.join("pickle",args.composer + ".pickle")
+        pickleFolder = ospath.join("pickle",args.composer)
+        if(ospath.isdir(pickleFolder) == False):
+            makedirs(pickleFolder)
         print("Saving "+pickleFile)
         with open(pickleFile,'wb') as k:
             pickle.dump(output_data, k)
@@ -247,7 +253,7 @@ def main(args):
         
         
 
-def process_midi(mid, filename, chords=False):
+def process_midi(mid, filename, chords=False, composer=False):
     output_data = {
         "degree":[],
         "dur":[],
@@ -334,12 +340,25 @@ def process_midi(mid, filename, chords=False):
     text += "Clock.schedule(lambda : Clock.clear(), start + {})\n".format(notePerCompass*(i+1))
 
     if(len(output_data["degree"])):
-        outputFile =  ospath.join("output",filename + ".py")
+        if(composer):
+            outputFile =  ospath.join("python",composer,filename + ".py")
+            outputFolder = ospath.join("python", composer)
+            if(ospath.isdir(outputFolder) == False):
+                makedirs(outputFolder)
+        else:
+            outputFile =  ospath.join("python",filename + ".py")
         print("Saving "+outputFile)
         with open(outputFile,'w') as f:
             f.write(text)
 
-        jsonFile = ospath.join("output",filename + ".json")
+        
+        if(composer):
+            jsonFile = ospath.join("json",composer,filename + ".json")
+            jsonFolder = ospath.join("json", composer)
+            if(ospath.isdir(jsonFolder) == False):
+                makedirs(jsonFolder)
+        else:
+            jsonFile = ospath.join("json",filename + ".json")
         out_json =  {
             "degree":output_data["degree"],
             "dur":output_data["dur_json"]
@@ -348,8 +367,12 @@ def process_midi(mid, filename, chords=False):
         with open(jsonFile,'w') as j:
             json.dump(out_json, j)
 
+        if(composer):
+            pickleFile = ospath.join("pickle",composer, filename + ".pickle")
+            
+        else:
+            pickleFile = ospath.join("pickle",filename + ".pickle")
         
-        pickleFile = ospath.join("output",filename + ".pickle")
         print("Saving "+pickleFile)
         with open(pickleFile,'wb') as k:
             pickle.dump(output_data, k)
