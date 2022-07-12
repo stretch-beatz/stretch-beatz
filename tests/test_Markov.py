@@ -1,26 +1,16 @@
-from Functions import Markov
+import pytest
+from FoxDot import *
+from stretch_beatz import *
 
-#mock Pattern class
-class TestStr:
-    data = []
 
-    def __init__(self,i):
-        self.data=i
-
-    def new(self,i):
-        self.data=i
-
-    def __str__(self):
-        return self.data.__str__()
-
-    def __iter__(self):
-        return self.data
-
-TestStr.Markov=Markov
-
-#p=TestStr([0,3,6,9,8,7,6,5,4,3,2,1])
-#p=TestStr([])
-
+class Test_Markov():
+    
+    def test__1(self):
+        # TODO : Tests need to be built, the originals are self confirming
+        
+        assert True == False
+         
+'''
 print("Test1 Starting")
 A = [0,3,6,9,8,7,4,1]
 p = TestStr(A)
@@ -136,3 +126,4 @@ p = TestStr(A)
 
 p.Markov(i=10000000,GiveSeed=0)
 print("Test13 Passed\n")
+'''
