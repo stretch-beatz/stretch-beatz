@@ -20,6 +20,11 @@ def makehalves(length):
 
 @PatternMethod
 def shell_sort(self, swaps=False,debug = False, palindrome = False): #This defines the section of the code that does the
+    ''' Returns the pattern and each stage of the pattern going through a shell sort
+        e.g. `P[50,25,5,20,10].shell_sort()` will return `P[50, 25, 5, 20, 10, 5, 25, 10, 20, 50, 5, 20, 10, 25, 50, 5, 10, 20, 25, 50]`
+        and  `P[50,25,5,20,10].shell_sort(swaps = True)` will add to the output for every number swap returning `P[50,25,5,20,10,5,25,50,20,10,5,25,10,20,50,5,20,10,25,50,5,10,20,25,50]`
+        and  `P[50,25,5,20,10].shell_sort(palindrome=True)` will also undo the change to smoothly return to the orignal pattern P[50, 25, 5, 20, 10, 5, 25, 10, 20, 50, 5, 20, 10, 25, 50, 5, 10, 20, 25, 50,5, 10, 20, 25, 50,5, 20, 10, 25, 50,5, 25, 10, 20, 50,50, 25, 5, 20, 10]
+    ''''
     items = self.data
     output = []
     output += items #output = output + items
